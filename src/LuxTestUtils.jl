@@ -1,8 +1,8 @@
 module LuxTestUtils
 
 using ComponentArrays, Optimisers, Preferences, LuxCore, LuxDeviceUtils, Test
-using ForwardDiff, ReverseDiff, Tracker, Zygote, FiniteDifferences
-# TODO: Yota, Enzyme
+using Enzyme, ForwardDiff, ReverseDiff, Tracker, Zygote, FiniteDifferences
+# TODO: Yota
 
 const JET_TARGET_MODULES = @load_preference("target_modules", nothing)
 
@@ -157,6 +157,7 @@ Compare the gradients computed by Zygote.jl (Reverse Mode AD) against:
   - Tracker.jl (Reverse Mode AD)
   - ReverseDiff.jl (Reverse Mode AD)
   - ForwardDiff.jl (Forward Mode AD)
+  - Enzyme.jl (Reverse Mode AD) **[Only Reverse Mode is Implemented Currently]**
   - FiniteDifferences.jl (Finite Differences)
 
 :::tip
@@ -232,6 +233,8 @@ function test_gradients_expr(__module__, __source__, f, args...;
     skip_zygote::Bool=false,
     skip_tracker::Bool=false,
     skip_reverse_diff::Bool=false,
+    # FIXME: Disable Enzyme by default in v0.1
+    skip_enzyme_reverse::Bool=false,
     # Skip Large Arrays
     large_arrays_skip_finite_differences::Bool=true,
     large_arrays_skip_forward_diff::Bool=true,
@@ -285,6 +288,11 @@ function test_gradients_expr(__module__, __source__, f, args...;
             $(esc.(args)...); skip=skip_finite_differences)
         finite_differences_broken = $finite_differences_broken && !skip_finite_differences
 
+        # FIXME: Enzyme Reverse on GPU doesn't work yet
+        skip_enzyme_reverse = $skip_enzyme_reverse || $gpu_testing
+        gs_enzyme = __gradient(_enzyme_reverse_mode, $(esc(f)), $(esc.(args)...);
+            skip=skip_enzyme_reverse)
+
         for idx in 1:($len)
             __test_gradient_pair_check($__source__, $(orig_exprs[1]), gs_zygote[idx],
                 gs_tracker[idx], "Zygote", "Tracker"; broken=tracker_broken,
@@ -316,7 +324,7 @@ function __test_gradient_pair_check(__source__, orig_expr, v1, v2, name1, name2;
 end
 
 function __test_pass(test_type, orig_expr, source)
-    @static if VERSION >= v"1.7"
+    @static if VERSION ≥ v"1.7"
         return Test.Pass(test_type, orig_expr, nothing, nothing, source)
     else
         return Test.Pass(test_type, orig_expr, nothing, nothing)
@@ -324,7 +332,7 @@ function __test_pass(test_type, orig_expr, source)
 end
 
 function __test_fail(test_type, orig_expr, source)
-    @static if VERSION >= v"1.9.0-rc1"
+    @static if VERSION ≥ v"1.9.0-rc1"
         return Test.Fail(test_type, orig_expr, nothing, nothing, nothing, source, false)
     else
         return Test.Fail(test_type, orig_expr, nothing, nothing, source)
@@ -402,6 +410,13 @@ function __fdiff_compatible_function(f, ::Val{N}) where {N}
     function __fdiff_compatible_function_closure(x::ComponentArray)
         return f([getproperty(x, Symbol("input_$i")) for i in 1:N]...)
     end
+end
+
+function _enzyme_reverse_mode(f, args...)
+    shadows = zero.(args)
+    new_args = Duplicated.(args, shadows)
+    Enzyme.autodiff(Reverse, f, new_args...)
+    return shadows
 end
 
 _named_tuple(x::ComponentArray) = NamedTuple(x)

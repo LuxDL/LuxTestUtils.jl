@@ -30,11 +30,17 @@ catch err
     global JET_TESTING_ENABLED = false
 end
 
-# Check if Enzyme will work
+# Check if Enzyme will work. Do this test in a different process to avoid crashing the main
+# process.
 try
     using Enzyme: Enzyme
-    __ftest(x) = x
-    Enzyme.autodiff(Enzyme.Reverse, __ftest, Enzyme.Active, Enzyme.Active(2.0))
+
+    filepath = joinpath(@__DIR__, "enzyme_functional.jl")
+    tmp_out, tmp_err = tempname(), tempname()
+    # run(pipeline(`$(Base.julia_cmd()) --project=$(tdir) $(filepath)`;
+    #     stdout=tmp_out, stderr=tmp_err))
+    run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "..")) $(filepath)`)
+
     global ENZYME_TESTING_ENABLED = true
 catch err
     @error "`Enzyme.jl` is currently not functional on $(VERSION). Enzyme tests will be \

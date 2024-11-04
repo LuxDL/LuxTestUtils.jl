@@ -10,6 +10,9 @@
 [![ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://img.shields.io/badge/ColPrac-Contributor's%20Guide-blueviolet)](https://github.com/SciML/ColPrac)
 [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle)
 
+> [!WARNING]
+> Package has been moved to a subdirectory in Lux https://github.com/LuxDL/Lux.jl/tree/main/lib/
+
 Utilities for testing [Lux.jl](http://lux.csail.mit.edu/).
 
 ## Installation
